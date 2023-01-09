@@ -107,33 +107,45 @@ y_pred = model.predict(x_test)
 print("The accuracy score of Naive Bayes Classifier is: ", format(accuracy_score(y_test,y_pred),"0.3f"))
 
 5.LWR
-from sklearn.datasets import load_iris
-from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
-data = load_iris()
-x = data.data
-y = data.target
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
-sc = StandardScaler()
-x = sc.fit_transform(x)
-x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.3)
+data = pd.read_csv("tips.csv")
+bill = data.total_bill
+tip = data.tip
 
-n = 1000
-loss_cur = 999
-model = MLPClassifier(hidden_layer_sizes=(4,3),activation = "logistic", solver = "sgd", learning_rate_init = 0.5, warm_start = True, max_iter = 1, verbose = True, random_state = 1)
-for _ in range(n):
-  model.fit(x_train, y_train)
-  loss_prev = loss_cur
-  loss_cur = model.loss_
-  for i in model.coefs_:
-    print(i, sep=" ")
-  if loss_prev - loss_cur <= 0.0001:
-    break
+mBill = np.mat(bill)
+mTip = np.mat(tip)
+m = mBill.shape[1]
+one = np.mat(np.ones(m))
+X = np.hstack((one.T, mBill.T))
 
-print("The accuracy of the model is: ",model.score(x_test, y_test))
+def kernel(point,xmat,k):
+  m,n = xmat.shape
+  weights = np.mat(np.eye(m))
+  for j in range(m):
+    diff = point - xmat[j]
+    weights[j,j] = np.exp(diff*diff.T/(-2*k**2))
+  return weights
 
-print("The final weights are: ")
-for i in model.coefs_:
-  print(i, sep = " ")
+def Beta(x_value,x,y,k):
+  weight = kernel(x_value,x,k)
+  W = (X.T * (weight * X)).I*(X.T *(weight * y.T))
+  return W
+
+def localWeightRegression(x,y,k):
+  m,n = x.shape
+  ypred = np.zeros(m)
+  for i in range(m):
+    ypred[i] = x[i] * Beta(x[i],x,y,k)
+  return ypred
+
+ypred = localWeightRegression(X,mTip,2)
+SortIndex = X[:,1].argsort(0)
+xsort = X[SortIndex][:,0]
+
+plt.figure()
+plt.scatter(bill,tip,color='blue')
+plt.plot(xsort[:,1],ypred[SortIndex],color='red',linewidth = 2)
